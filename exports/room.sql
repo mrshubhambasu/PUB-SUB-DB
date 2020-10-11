@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS rooms(
+   hotel_id    VARCHAR(8) NOT NULL PRIMARY KEY
+  ,room_id     VARCHAR(3) NOT NULL
+  ,description VARCHAR(31) NOT NULL
+  ,name        VARCHAR(31) NOT NULL
+);
+INSERT INTO rooms(hotel_id,room_id,description,name) VALUES ('BH~46456','S2Q','JUNIOR SUITES WITH 2 QUEEN BEDS','JUNIOR SUITES WITH 2 QUEEN BEDS');
