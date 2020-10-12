@@ -1,33 +1,30 @@
-package main
+package pub
 
 import (
-	"assignment/config"
 	"assignment/rabbitmq"
-	"io/ioutil"
-
-	log "github.com/sirupsen/logrus"
 )
 
-func main() {
-	// Setting Logger Format
-	log.SetFormatter(&log.JSONFormatter{})
-
-	// Loading Configurations
-	config.Load()
-
-	// Setting Up rabbitMQ
-	conn := rabbitmq.NewConnection(config.ReadEnvString("RABBITMQ_URL"))
-	conn.CreateChannel()
-	conn.DeclareQueue(config.ReadEnvString("QUEUE_NAME"))
-
-	//TBD: Close connection in defer
-
-	// Reading JSON file to send
-	body, err := ioutil.ReadFile("inputfile.json")
+func InitService(rabbitMQURL string, data []byte) error {
+	rabbitMQ, err := rabbitmq.NewConnection(rabbitMQURL)
 	if err != nil {
-		log.Error(err)
+		return err
+	}
+	defer rabbitMQ.Close()
+
+	err = rabbitMQ.CreateChannel()
+	if err != nil {
+		return err
+	}
+
+	err = rabbitMQ.DeclareQueue()
+	if err != nil {
+		return err
 	}
 
 	// Sending File
-	conn.SendData(body)
+	err = rabbitMQ.SendData(data)
+	if err != nil {
+		return err
+	}
+	return nil
 }

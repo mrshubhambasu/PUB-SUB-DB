@@ -1,3 +1,2 @@
 RABBITMQ_URL : "amqp://guest:guest@localhost:5672/"
-QUEUE_NAME: "hello"
 DSN : "root@tcp(127.0.0.1:3306)/hotel?charset=utf8mb4&parseTime=True&loc=Local"

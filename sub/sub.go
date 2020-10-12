@@ -1,45 +1,64 @@
-package main
+package sub
 
 import (
-	"assignment/config"
+	"assignment/datastore"
+	"assignment/model"
 	"assignment/rabbitmq"
+	"encoding/json"
 
 	log "github.com/sirupsen/logrus"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
 )
 
-func main() {
-	// Setting Logger Format
-	log.SetFormatter(&log.JSONFormatter{})
-
-	// Loading Configurations
-	config.Load()
-
-	// Setting Up rabbitMQ
-	conn := rabbitmq.NewConnection(config.ReadEnvString("RABBITMQ_URL"))
-	conn.CreateChannel()
-	conn.DeclareQueue(config.ReadEnvString("QUEUE_NAME"))
-
-	// Initializig DB Connection
-	dsn := config.ReadEnvString("DSN")
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+func InitService(rabbitMQURL, dsn string) error {
+	rabbitMQ, err := rabbitmq.NewConnection(rabbitMQURL)
 	if err != nil {
-		log.Error("err", err)
+		return err
+	}
+	defer rabbitMQ.Close()
+
+	err = rabbitMQ.CreateChannel()
+	if err != nil {
+		return err
+	}
+
+	err = rabbitMQ.DeclareQueue()
+	if err != nil {
+		return err
+	}
+
+	db, err := datastore.Init(dsn)
+	if err != nil {
+		return err
 	}
 
 	// Get Message Channel
-	msgs := conn.RecieveData()
+	msgs, err := rabbitMQ.RecieveData()
+	if err != nil {
+		return err
+	}
+
 	forever := make(chan bool)
+
+	dataModel := model.Data{}
 
 	// Waiting For Messages
 	go func() {
 		for d := range msgs {
-			log.Info("Recieved Data")
-			go pushToDatabase(d.Body, db)
+			dataModel, _ := byteToStruct(d.Body, dataModel)
+			datastore.Push(dataModel, db)
 		}
 	}()
 
 	log.Printf(" [*] Waiting for messages. To exit press CTRL+C")
 	<-forever
+	return nil
+}
+
+// This function populates the struct with data from byte array
+func byteToStruct(bytes []byte, dataModel model.Data) (model.Data, error) {
+	err := json.Unmarshal(bytes, &dataModel)
+	if err != nil {
+		return model.Data{}, err
+	}
+	return dataModel, nil
 }

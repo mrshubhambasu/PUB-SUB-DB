@@ -1,4 +1,4 @@
-package main
+package model
 
 type Data struct {
 	Offers []Offers `json:"offers"`

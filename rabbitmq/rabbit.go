@@ -1,7 +1,6 @@
 package rabbitmq
 
 import (
-	log "github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
 )
 
@@ -13,39 +12,49 @@ type AMQP struct {
 }
 
 // NewConnection : Creates New RabbitMQ Connection Object
-func NewConnection(path string) *AMQP {
+func NewConnection(path string) (*AMQP, error) {
 	conn, err := amqp.Dial(path)
-	failOnError(err, "Failed to connect to RabbitMQ")
+	if err != nil {
+		return nil, err
+	}
 
 	amqp := new(AMQP)
 	amqp.conn = conn
-	return amqp
+	return amqp, nil
 }
 
 // CreateChannel : Creates New RabbitMQ Channel
-func (c *AMQP) CreateChannel() {
+func (c *AMQP) CreateChannel() error {
 	ch, err := c.conn.Channel()
 	c.Ch = ch
 
-	failOnError(err, "Failed to open a channel")
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // DeclareQueue : Declares RabbitMQ Queue
-func (c *AMQP) DeclareQueue(name string) {
+func (c *AMQP) DeclareQueue() error {
 	q, err := c.Ch.QueueDeclare(
-		name,  // name
-		false, // durable
-		false, // delete when unused
-		false, // exclusive
-		false, // no-wait
-		nil,   // arguments
+		"message", // name can be taken from config
+		false,     // durable
+		false,     // delete when unused
+		false,     // exclusive
+		false,     // no-wait
+		nil,       // arguments
 	)
 	c.Queue = &q
-	failOnError(err, "Failed to declare a queue")
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // SendData : Sends Data
-func (c *AMQP) SendData(data []byte) {
+func (c *AMQP) SendData(data []byte) error {
 	err := c.Ch.Publish(
 		"",           // exchange
 		c.Queue.Name, // routing key
@@ -55,11 +64,15 @@ func (c *AMQP) SendData(data []byte) {
 			ContentType: "text/plain",
 			Body:        data,
 		})
-	failOnError(err, "Failed to publish a message")
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // RecieveData : Recieves Data
-func (c *AMQP) RecieveData() <-chan amqp.Delivery {
+func (c *AMQP) RecieveData() (<-chan amqp.Delivery, error) {
 	msgs, err := c.Ch.Consume(
 		c.Queue.Name, // queue
 		"",           // consumer
@@ -69,14 +82,14 @@ func (c *AMQP) RecieveData() <-chan amqp.Delivery {
 		false,        // no-wait
 		nil,          // args
 	)
-	failOnError(err, "Failed to register a consumer")
+	if err != nil {
+		return msgs, err
+	}
 
-	return msgs
+	return msgs, nil
 }
 
-// Handles Errors Gracefully
-func failOnError(err error, msg string) {
-	if err != nil {
-		log.Fatalf("%s: %s", msg, err) // not logrus
-	}
+// Close : Close connection
+func (c *AMQP) Close() {
+	c.conn.Close()
 }
